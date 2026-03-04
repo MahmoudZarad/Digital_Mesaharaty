@@ -1,0 +1,6 @@
+@DailyReligiousMessages_HostAddress = http://localhost:5001
+
+GET {{DailyReligiousMessages_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
