@@ -1,21 +1,22 @@
 using DailyReligiousMessages.Containers;
 using DailyReligiousMessages.Interfaces;
 using DailyReligiousMessages.Jobs;
+using DailyReligiousMessages.Middlewares;
 using DailyReligiousMessages.Services;
 using Hangfire;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Controllers & Swagger
+// Add services
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// Settings
+// Configuration bindings
 builder.Services.Configure<TelegramSettings>(builder.Configuration.GetSection("TelegramSettings"));
 builder.Services.Configure<AiSettings>(builder.Configuration.GetSection("AiSettings"));
 
-// App Services
+// App services
 builder.Services.AddHttpClient<IAiService, AiService>();
 builder.Services.AddScoped<ITelegramService, TelegramService>();
 builder.Services.AddScoped<DailyMessageJob>();
@@ -26,20 +27,23 @@ builder.Services.AddHangfireServer();
 
 var app = builder.Build();
 
-// Swagger UI
+// Dev only: Swagger
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
-    app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "DailyReligiousMessages API v1"));
+    app.UseSwaggerUI();
 }
 
 app.UseHttpsRedirection();
 app.UseAuthorization();
 
-// Hangfire Dashboard
-app.MapHangfireDashboard("/hangfire");
+app.UseMiddleware<BasicAuthMiddleware>();
 
-// Recurring Job - كل يوم الساعة 8 صباحًا بتوقيت القاهرة
+// Basic auth middleware protects the Hangfire dashboard. Credentials are read from environment or config.
+app.UseHangfireDashboard("/hangfire", new DashboardOptions
+{ Authorization = new[] { new MyFreePassFilter() } });
+
+// Recurring job: everyday at 08:00 (Cairo timezone if available)
 var cairoTz = TimeZoneInfo.GetSystemTimeZones()
     .FirstOrDefault(tz => tz.Id is "Egypt Standard Time" or "Africa/Cairo")
     ?? TimeZoneInfo.Utc;
